@@ -19,38 +19,32 @@ extern "C"
 #define NUM_LEDS 288
 #define LED_PIN 0
 #define UDP_PORT 4210
-#define QUEUE_SIZE 35
+#define DESTINATION_PORT 8008
+#define PING_INTERVAL 2000
+#define TIMEOUT 3000
+#define QUEUE_SIZE 50
 #define TARGET_QUEUE_SIZE 30
-#define FRAME_INTERVAL 16
+#define FRAME_INTERVAL 10
 
-const int normalPacketSize = NUM_LEDS * 3;
+const int frameSize = NUM_LEDS * 3;
 
 WiFiClient client;
 WiFiUDP udp;
-uint8_t incomingPacket[normalPacketSize];
-uint8_t queueOut[normalPacketSize];
-RingBufCPP<uint8_t[normalPacketSize], QUEUE_SIZE> queue;
+uint8_t incomingPacket[frameSize];
+uint8_t queueOut[frameSize];
+RingBufCPP<uint8_t[frameSize], QUEUE_SIZE> queue;
 IPAddress destinationIp;
 
 void setup()
 {
+    Serial.begin(115200);
     WiFi.setSleepMode(WIFI_NONE_SLEEP);
     WiFi.mode(WIFI_STA);
-    pinMode(LED_BUILTIN, OUTPUT);
-
     WiFi.begin(STR(WIFI_SSID), STR(WIFI_PASS));
 
-    Serial.begin(115200);
     Serial.println("Connecting");
-    Serial.setDebugOutput(true);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(500);
-    }
-    Serial.begin(115200);
+    waitForWifi();
 
-    Serial.print("Connected, IP address: ");
-    Serial.println(WiFi.localIP());
     WiFi.setAutoReconnect(true);
     WiFi.persistent(true);
 
@@ -58,74 +52,92 @@ void setup()
 
     udp.begin(UDP_PORT);
     FastLED.addLeds<NEOPIXEL, LED_PIN>((CRGB *)queueOut, NUM_LEDS);
-    Serial.setDebugOutput(true);
 }
 
 long lastPingTime = 0;
 long lastReceivedPacket = 0;
-long lastFrame = 0;
+long nextFrame = 0;
+long timeNow = millis();
 
 void loop()
 {
-    long timeNow = millis();
-    if (lastFrame == 0)
-    {
-        lastFrame = timeNow - FRAME_INTERVAL;
-    }
-
-    int diff = int(timeNow - lastFrame);
-    int frameDelay = TARGET_QUEUE_SIZE - static_cast<int>(queue.numElements());
-    bool shouldPull = diff > FRAME_INTERVAL + frameDelay;
+    timeNow = millis();
+    int queueSizeDiff = TARGET_QUEUE_SIZE - static_cast<int>(queue.numElements());
+    int frameDelay = (queueSizeDiff > 0) - (queueSizeDiff < 0);
+    bool shouldPull = timeNow > nextFrame + frameDelay;
 
     if (shouldPull)
     {
-        bool popped = queue.pull(&queueOut);
-        if (popped)
-        {
-            FastLED.show();
-            while (Serial.available() > 0)
-            {
-                Serial.read();
-            }
-            lastFrame = timeNow;
-        }
+        showFrame();
     }
-    if (int(timeNow - lastPingTime) > 2000)
+
+    if (int(timeNow - lastPingTime) > PING_INTERVAL)
     {
-        udp.beginPacket(destinationIp, 8008);
-        udp.endPacket();
-        udp.flush();
-        lastPingTime = timeNow;
+        ping();
     }
 
     int packetSize = udp.parsePacket();
-    if (packetSize == 0)
+    if (packetSize > 0)
     {
-        checkReconnect(timeNow);
+        readPacket();
     }
     else
     {
-        int len = udp.read(incomingPacket, normalPacketSize);
-        if (len == normalPacketSize)
-        {
-            lastReceivedPacket = timeNow;
-            queue.add(&incomingPacket, true);
-        }
+        checkReconnect();
     }
 }
 
-void checkReconnect(int timeNow)
+void showFrame()
 {
-    if (int(lastReceivedPacket) > 0 and int(timeNow - lastReceivedPacket) > 3000)
+    bool popped = queue.pull(&queueOut);
+    if (popped)
+    {
+        FastLED.show();
+        while (Serial.available() > 0)
+        {
+            Serial.read();
+        }
+        nextFrame = timeNow + FRAME_INTERVAL;
+    }
+}
+
+void ping()
+{
+    udp.beginPacket(destinationIp, DESTINATION_PORT);
+    udp.endPacket();
+    udp.flush();
+    lastPingTime = timeNow;
+}
+
+void readPacket()
+{
+    int len = udp.read(incomingPacket, frameSize);
+    if (len == frameSize)
+    {
+        queue.add(&incomingPacket, true);
+        lastReceivedPacket = timeNow;
+    }
+}
+
+void waitForWifi()
+{
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(500);
+    }
+
+    Serial.print("Connected, IP address: ");
+    Serial.println(WiFi.localIP());
+}
+
+void checkReconnect()
+{
+    if (int(lastReceivedPacket) > 0 and int(timeNow - lastReceivedPacket) > TIMEOUT)
     {
         WiFi.reconnect();
         Serial.print("Reconnecting...");
 
-        while (WiFi.status() != WL_CONNECTED)
-        {
-            delay(500);
-        }
-        Serial.print("Reconnected");
+        waitForWifi();
         lastReceivedPacket = millis();
     }
 }
