@@ -1,18 +1,10 @@
-#include <ESP8266TimerInterrupt.h>
-#include <ESP8266_ISR_Timer.h>
-#include <ESP8266_ISR_Timer.hpp>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 #include "FastLED.h"
 #include <RingBufCPP.h>
 #include <Esp.h>
-extern "C"
-{
-#include "user_interface.h"
-}
 
-#define USING_TIM_DIV1 true
-#define FASTLED_INTERRUPT_RETRY_COUNT 1
+#define FASTLED_INTERRUPT_RETRY_COUNT 0
 #define XSTR(x) #x
 #define STR(x) XSTR(x)
 
@@ -78,12 +70,13 @@ void loop()
         ping();
     }
 
-    while (udp.parsePacket())
+    int parsedPackets = 0;
+    while (udp.parsePacket() && parsedPackets++ < 2)
     {
         readPacket();
     }
 
-        checkReconnect();
+    checkReconnect();
 }
 
 void showFrame()
@@ -117,7 +110,7 @@ void readPacket()
     if (len == 3)
     {
         for (int i = 3; i < frameSize; i++)
-    {
+        {
             incomingPacket[i] = incomingPacket[i % 3];
         }
     }
