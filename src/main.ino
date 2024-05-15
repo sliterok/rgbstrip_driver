@@ -22,8 +22,8 @@ extern "C"
 #define DESTINATION_PORT 8008
 #define PING_INTERVAL 2000
 #define TIMEOUT 3000
-#define QUEUE_SIZE 50
-#define TARGET_QUEUE_SIZE 30
+#define QUEUE_SIZE 52
+#define TARGET_QUEUE_SIZE 42
 #define FRAME_INTERVAL 12
 
 const int frameSize = NUM_LEDS * 3;
@@ -111,11 +111,18 @@ void ping()
 void readPacket()
 {
     int len = udp.read(incomingPacket, frameSize);
-    if (len == frameSize)
+    if (len == 0)
+        return;
+
+    if (len == 3)
     {
-        queue.add(&incomingPacket, true);
-        lastReceivedPacket = timeNow;
+        for (int i = 3; i < frameSize; i++)
+    {
+            incomingPacket[i] = incomingPacket[i % 3];
+        }
     }
+    queue.add(&incomingPacket, true);
+    lastReceivedPacket = timeNow;
 }
 
 void waitForWifi()
