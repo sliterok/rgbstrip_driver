@@ -24,7 +24,7 @@ extern "C"
 #define TIMEOUT 3000
 #define QUEUE_SIZE 50
 #define TARGET_QUEUE_SIZE 30
-#define FRAME_INTERVAL 10
+#define FRAME_INTERVAL 12
 
 const int frameSize = NUM_LEDS * 3;
 
@@ -62,9 +62,11 @@ long timeNow = millis();
 void loop()
 {
     timeNow = millis();
-    int queueSizeDiff = TARGET_QUEUE_SIZE - static_cast<int>(queue.numElements());
-    int frameDelay = (queueSizeDiff > 0) - (queueSizeDiff < 0);
-    bool shouldPull = timeNow > nextFrame + frameDelay;
+    int queueSize = queue.numElements();
+    int queueSizeDiff = TARGET_QUEUE_SIZE - queueSize;
+    int frameDelay = abs(queueSizeDiff) > 2 ? (queueSizeDiff > 0) - (queueSizeDiff < 0) : 0;
+    int timeDiff = timeNow - nextFrame - frameDelay;
+    bool shouldPull = timeDiff >= 0;
 
     if (shouldPull)
     {
@@ -76,15 +78,12 @@ void loop()
         ping();
     }
 
-    int packetSize = udp.parsePacket();
-    if (packetSize > 0)
+    while (udp.parsePacket())
     {
         readPacket();
     }
-    else
-    {
+
         checkReconnect();
-    }
 }
 
 void showFrame()
