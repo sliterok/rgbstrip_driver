@@ -4,7 +4,7 @@
 #include <RingBufCPP.h>
 #include <Esp.h>
 
-#define FASTLED_INTERRUPT_RETRY_COUNT 0
+#define FASTLED_INTERRUPT_RETRY_COUNT 3
 #define XSTR(x) #x
 #define STR(x) XSTR(x)
 
