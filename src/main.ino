@@ -71,7 +71,7 @@ void loop()
     }
 
     int parsedPackets = 0;
-    while (udp.parsePacket() && parsedPackets++ < 2)
+    while (parsedPackets++ < 10 && udp.parsePacket())
     {
         readPacket();
     }
