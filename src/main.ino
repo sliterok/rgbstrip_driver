@@ -10,8 +10,8 @@
 
 #define NUM_LEDS 288
 #define LED_PIN 0
-#define UDP_PORT 4210
-#define DESTINATION_PORT 8008
+#define UDP_PORT 8008
+#define DESTINATION_PORT 8009
 #define PING_INTERVAL 2000
 #define TIMEOUT 3000
 #define QUEUE_SIZE 52
@@ -40,7 +40,7 @@ void setup()
     WiFi.setAutoReconnect(true);
     WiFi.persistent(true);
 
-    updateDestination();
+    // updateDestination();
 
     udp.begin(UDP_PORT);
     FastLED.addLeds<NEOPIXEL, LED_PIN>((CRGB *)queueOut, NUM_LEDS);
@@ -95,7 +95,7 @@ void showFrame()
 
 void ping()
 {
-    udp.beginPacket(destinationIp, DESTINATION_PORT);
+    udp.beginPacket(STR(DESTINATION), DESTINATION_PORT);
     udp.endPacket();
     udp.flush();
     lastPingTime = timeNow;
@@ -141,17 +141,17 @@ void checkReconnect()
     }
 }
 
-void updateDestination()
-{
-    int err = WiFi.hostByName(STR(DESTINATION), destinationIp);
-    if (err == 1)
-    {
-        Serial.print("Destination IP address: ");
-        Serial.println(destinationIp);
-    }
-    else
-    {
-        Serial.print("Error getting destination: ");
-        Serial.println(err);
-    }
-}
+// void updateDestination()
+// {
+//     int err = WiFi.hostByName(STR(DESTINATION), destinationIp);
+//     if (err == 1)
+//     {
+//         Serial.print("Destination IP address: ");
+//         Serial.println(destinationIp);
+//     }
+//     else
+//     {
+//         Serial.print("Error getting destination: ");
+//         Serial.println(err);
+//     }
+// }
